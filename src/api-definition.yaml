@@ -1,0 +1,242 @@
+openapi: "3.0.0"
+
+info:
+  version: 0.0.1
+  title: Express Project
+
+servers:
+  - url: http://localhost:3001
+
+paths:
+  /contracts/:id:
+    get:
+      summary: Get contract by id
+      parameters:
+        - in: header
+          name: profile_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+
+  /contracts:
+    get:
+      summary: Get a list of contracts by profile id
+      parameters:
+        - in: header
+          name: profile_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contract"
+
+  /jobs/unpaid:
+    get:
+      summary: Get a list of unpaid jobs for a user, only active contracts
+      parameters:
+        - in: header
+          name: profile_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+
+  /jobs/:job_id/pay:
+    post:
+      summary:  Pay for a job
+      parameters:
+        - in: header
+          name: profile_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: string
+                idempotency_token:
+                  type: string
+                  description: A client side token that should be unique to prevent the transaction from being run more than once
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paid:
+                    type: boolean
+
+  /balances/deposit/:userId:
+    post:
+      summary: Deposit money into client
+      parameters:
+        - in: header
+          name: profile_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: string
+                idempotency_token:
+                  type: string
+                  description: A client side token that should be unique to prevent the transaction from being run more than once
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paid:
+                    type: boolean
+
+  /admin/best-profession:
+    get:
+      summary: Get a list of contracts by profile id
+      parameters:
+        - in: header
+          name: profile_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: start
+          description: Start date in unix timestamp
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: end
+          description: End date in unix timestamp
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profession:
+                    type: string
+
+  /admin/best-clients:
+    get:
+      summary: Get a list of contracts by profile id
+      parameters:
+        - in: header
+          name: profile_id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: start
+          description: Start date in unix timestamp
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: end
+          description: End date in unix timestamp
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: number
+                    fullname:
+                      type: string
+                    paid:
+                      type: number
+
+
+components:
+  schemas:
+    Contract:
+      type: object
+      properties:
+        id:
+          type: number
+        terms:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        ContractorId:
+          type: number
+        ClientId:
+          type: number
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: number
+        description:
+          type: string
+        price:
+          type: number
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        ContractorId:
+          type: number
+        paid:
+          type: number
+        paymentDate:
+          type: string
