@@ -2,10 +2,15 @@ const Sequelize = require('sequelize');
 
 const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: './database.sqlite3'
+  storage: './database.sqlite3',
+  logging: false
 });
 
 class Profile extends Sequelize.Model {}
+Profile.TYPE = {
+    client: "client",
+    contractor: "contractor",
+}
 Profile.init(
   {
     firstName: {
@@ -24,7 +29,7 @@ Profile.init(
       type:Sequelize.DECIMAL(12,2)
     },
     type: {
-      type: Sequelize.ENUM('client', 'contractor')
+      type: Sequelize.ENUM( ...Object.values(Profile.TYPE))
     }
   },
   {
@@ -34,6 +39,11 @@ Profile.init(
 );
 
 class Contract extends Sequelize.Model {}
+Contract.STATUS = {
+    new: "new",
+    in_progress: "in_progress",
+    terminated: "terminated",
+}
 Contract.init(
   {
     terms: {
@@ -41,7 +51,7 @@ Contract.init(
       allowNull: false
     },
     status:{
-      type: Sequelize.ENUM('new','in_progress','terminated')
+      type: Sequelize.ENUM(...Object.values(Contract.STATUS))
     }
   },
   {

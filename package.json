@@ -10,11 +10,23 @@
   },
   "scripts": {
     "start": "nodemon ./src/server.js",
-    "seed": "node ./scripts/seedDb.js"
+    "seed": "node ./scripts/seedDb.js",
+    "tests": "mocha --timeout 10000"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run tests",
+      "pre-push": "npm run tests"
+    }
   },
   "devDependencies": {
+    "chai": "^4.2.0",
+    "chai-http": "^4.3.0",
     "concurrently": "4.1.0",
-    "nodemon": "1.19.1"
+    "husky": "^4.2.5",
+    "mocha": "^8.1.1",
+    "nodemon": "1.19.1",
+    "uuid": "^8.3.0"
   },
   "engines": {
     "node": ">=10.16.3"
