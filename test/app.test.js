@@ -9,15 +9,17 @@ const { expect } = chai;
 chai.use(chaiHttp);
 
 
+
 let contractorId = 8;
+let contractorContractId = 9;
 let contractorId_UnpaidJobs = 6;
 let contractorId_UnpaidJobs_TerminatedContract = 1;
 let clientId  = 1;
+let clientContractId  = 2;
 let jobId_PayJob_ContractTerminated_Unpaid = 9; /* for clientId 1 */
 let jobId_PayJob_ContractInProgress_Unpaid = 2; /* for clientId 1 */
 let jobId_PayJob_ContractInProgress_Paid = 12; /* for clientId 1 */
 
-let jobAmount = 201.00; /* For jobId 2 */
 let depositAmountLessThan25Percent = 50; /* For clientId 1 */
 let depositAmountMoreThan25Percent = 1000; /* For clientId 1 */
 
@@ -56,10 +58,10 @@ describe("Contracts", () => {
         await commandExec("npm", ["run", "seed"],null,false);
     });
 
-    it("Positive - Get by id", done => {
+    it("Positive - Get by id - Contractor", done => {
         chai
             .request(app)
-            .get("/contracts/"+contractorId)
+            .get("/contracts/"+contractorContractId)
             .set('profile_id', contractorId)
             .end((err, res) => {
                 expect(res).to.have.status(200);
@@ -72,15 +74,34 @@ describe("Contracts", () => {
                 expect(res.body.ContractorId).to.be.an("number");
                 expect(res.body.ClientId).to.be.an("number");
 
-                expect(res.body.id).to.equals(contractorId);
+                expect(res.body.ContractorId).to.equals(contractorId);
                 done();
             });
     });
-
-    it("Negative - Can not get another contractors information", done => {
+    it("Positive - Get by id - Client", done => {
         chai
             .request(app)
-            .get("/contracts/"+clientId)
+            .get("/contracts/"+clientContractId)
+            .set('profile_id', clientId)
+            .end((err, res) => {
+                expect(res).to.have.status(200);
+
+                expect(res.body.id).to.be.an("number");
+                expect(res.body.terms).to.be.an("string");
+                expect(res.body.status).to.be.an("string");
+                expect(res.body.createdAt).to.be.an("string");
+                expect(res.body.updatedAt).to.be.an("string");
+                expect(res.body.ContractorId).to.be.an("number");
+                expect(res.body.ClientId).to.be.an("number");
+
+                expect(res.body.ClientId).to.equals(clientId);
+                done();
+            });
+    });
+    it("Negative - Can not get another contracts information if it does not belong to that contractor", done => {
+        chai
+            .request(app)
+            .get("/contracts/"+clientContractId)
             .set('profile_id', contractorId)
             .end((err, res) => {
                 expect(res).to.have.status(401);
@@ -88,7 +109,6 @@ describe("Contracts", () => {
                 done();
             });
     });
-
 
     it("Positive - Get all contracts for CONTRACTOR profile", done => {
         chai
@@ -111,7 +131,6 @@ describe("Contracts", () => {
                 done();
             });
     });
-
     it("Positive - Get all contracts for CLIENT profile", done => {
         chai
             .request(app)
@@ -142,7 +161,7 @@ describe("Jobs", () => {
         await commandExec("npm", ["run", "seed"],null,false);
     });
 
-    it("Positive - Get all unpaid jobs for profile", done => {
+    it("Positive - Get all unpaid jobs for Contractor", done => {
         chai
             .request(app)
             .get("/jobs/unpaid")
@@ -165,13 +184,36 @@ describe("Jobs", () => {
                 done();
             });
     });
+    it("Positive - Get all unpaid jobs for Client", done => {
+        chai
+            .request(app)
+            .get("/jobs/unpaid")
+            .set('profile_id', clientId)
+            .end((err, res) => {
+                expect(res).to.have.status(200);
+
+
+                expect(res.body).to.be.an("array");
+                expect(res.body[0].id).to.be.an("number");
+                expect(res.body[0].description).to.be.an("string");
+                expect(res.body[0].price).to.be.an("number");
+                expect(res.body[0].createdAt).to.be.an("string");
+                expect(res.body[0].updatedAt).to.be.an("string");
+                expect(res.body[0].ContractId).to.be.an("number");
+
+                expect(res.body.length).to.equals(1);
+                expect(res.body[0].paid).to.equals(null);
+                expect(res.body[0].paymentDate).to.equals(null);
+                done();
+            });
+    });
     it("Negative - Get all unpaid jobs for profile, excluding terminated contracts", done => {
         chai
             .request(app)
             .get("/jobs/unpaid")
             .set('profile_id', contractorId_UnpaidJobs_TerminatedContract)
             .end((err, res) => {
-                expect(res).to.have.status(404);
+                expect(res).to.have.status(200);
 
                 done();
             });
@@ -183,7 +225,6 @@ describe("Jobs", () => {
             .post("/jobs/" + jobId_PayJob_ContractInProgress_Unpaid + "/pay")
             .set('profile_id', clientId)
             .send({
-                amount: jobAmount,
                 idempotency_token: uuidv4(),
             })
             .end((err, res) => {
@@ -205,7 +246,6 @@ describe("Jobs", () => {
             .post("/jobs/" + jobId_PayJob_ContractInProgress_Unpaid + "/pay")
             .set('profile_id', clientId)
             .send({
-                amount: jobAmount,
                 // idempotency_token: uuidv4(),
             })
             .end((err, res) => {
@@ -220,7 +260,6 @@ describe("Jobs", () => {
             .post("/jobs/" + jobId_PayJob_ContractInProgress_Paid + "/pay")
             .set('profile_id', clientId)
             .send({
-                amount: jobAmount,
                 idempotency_token: uuidv4(),
             })
             .end((err, res) => {
@@ -235,7 +274,6 @@ describe("Jobs", () => {
             .post("/jobs/" + jobId_PayJob_ContractTerminated_Unpaid + "/pay")
             .set('profile_id', clientId)
             .send({
-                amount: jobAmount,
                 idempotency_token: uuidv4(),
             })
             .end((err, res) => {

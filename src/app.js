@@ -12,16 +12,19 @@ app.set('models', sequelize.models);
  * @returns contract by id
  */
 app.get('/contracts/:id',getProfile ,async (req, res) =>{
-    const {Contract} = req.app.get('models');
+    const {Contract, Profile} = req.app.get('models');
     const {id} = req.params;
-
-    if(id != req.profile.id)
-        return res.status(401).end();
 
     const contract = await Contract.findOne({where: {id}});
 
     if(!contract)
         return res.status(404).end();
+
+    if((req.profile.type === Profile.TYPE.contractor && contract.ContractorId !==  req.profile.id) ||
+        (req.profile.type === Profile.TYPE.client && contract.ClientId !==  req.profile.id))
+    {
+        return res.status(401).end();
+    }
 
     res.json(contract);
 });
@@ -51,10 +54,18 @@ app.get('/contracts',getProfile ,async (req, res) =>{
  * @returns get a list of unpaid jobs for a user, only active contracts
  */
 app.get('/jobs/unpaid',getProfile ,async (req, res) =>{
-    const {Contract, Job} = req.app.get('models');
+    const {Profile, Contract, Job} = req.app.get('models');
 
-    let jobs = await Job.findAll({include: [ { model: Contract, where: { ContractorId: req.profile.id, status: { [Op.ne]: Contract.STATUS.terminated }  }} ],
-                               where: { paid: null }});
+    let jobs = null;
+    if(req.profile.type === Profile.TYPE.contractor)
+        jobs = await Job.findAll({include: [ { model: Contract, where: { ContractorId: req.profile.id, status: { [Op.ne]: Contract.STATUS.terminated }  }} ],
+                                 where: { paid: null }});
+    else if(req.profile.type === Profile.TYPE.client)
+        jobs = await Job.findAll({include: [ { model: Contract, where: { ClientId: req.profile.id, status: { [Op.ne]: Contract.STATUS.terminated }  }} ],
+                                 where: { paid: null }});
+    else
+        return res.status(500).end();
+
     if(!jobs.length)
         return res.status(404).end();
 
@@ -67,17 +78,14 @@ app.get('/jobs/unpaid',getProfile ,async (req, res) =>{
 app.post('/jobs/:job_id/pay',getProfile ,async (req, res) =>{
     const {Profile, Contract, Job} = req.app.get('models');
     const {job_id} = req.params;
-    const {amount, idempotency_token} = req.body;
+    const {idempotency_token} = req.body;
 
-    if(!amount)
-        return res.status(500).send("Field: amount is required");
     if(!idempotency_token)
         return res.status(500).send("Field: idempotency_token is required");
     if(req.profile.type !== Profile.TYPE.client)
         return res.status(401).end();
 
     //TODO: Store idempotency token in cache for 24 hours and add condition to no process transaction with that token again
-
 
     let job = await Job.findOne({include: [ { model: Contract, where: { ClientId: req.profile.id, status: { [Op.ne]: Contract.STATUS.terminated }  }} ],
                                   where: {id: job_id }});
@@ -89,12 +97,12 @@ app.post('/jobs/:job_id/pay',getProfile ,async (req, res) =>{
         return res.status(500).send("Insufficient funds");
 
 
-    /* Move money from client to contractor, then mark job as paid */
+    /* Move money from client to contractor and then mark job as paid */
     await sequelize.transaction(async (t) => {
-        await job.update({paid: 1, paymentDate: new Date()});
+        await job.update({paid: 1, paymentDate: new Date()}, { transaction: t });
 
-        await Profile.increment({ balance: amount}, { where: {id: job.Contract.ContractorId}});
-        await Profile.decrement({ balance: amount}, { where: {id: job.Contract.ClientId}});
+        await Profile.increment({ balance: job.price}, { where: {id: job.Contract.ContractorId}, transaction: t});
+        await Profile.decrement({ balance: job.price}, { where: {id: job.Contract.ClientId}, transaction: t });
     });
 
     res.json({paid: true});
@@ -130,9 +138,7 @@ app.post('/balances/deposit/:userId',getProfile ,async (req, res) =>{
     if(resp && (amount > (resp[0].dataValues.unpaidJobs*0.25)) )
         return res.status(500).send("Deposit must be less than 25% of unpaid jobs");
 
-    // await sequelize.transaction(async (t) => {
-        await Profile.increment({ balance: amount}, { where: {id: userId}});
-    // });
+    await Profile.increment({ balance: amount}, { where: {id: userId}});
 
     res.json({paid: true});
 });
@@ -150,26 +156,6 @@ app.get('/admin/best-profession',getProfile ,async (req, res) =>{
         return res.status(500).send("Query string param: end is required");
 
     //TODO: Authorize admin queries
-
-    // let resp = await Profile.findAll({
-    //     include: [
-    //         {
-    //             model: Contract,
-    //             include: [Job]
-    //         },
-    //     ],
-    //     where: {
-    //         paid: {[Op.ne]: null},
-    //         [Op.and]: [
-    //             {paymentDate: {[Op.gt]: new Date(start)}},
-    //             {paymentDate: {[Op.lte]: new Date(end)}}]
-    //     },
-    //     attributes: [
-    //         "proffession",
-    //         [sequelize.fn('sum', sequelize.col('price')), 'paid_amount'],
-    //     ],
-    //     group: ['ContractorId'],
-    // });
 
     const resp = await sequelize.query("SELECT P.profession, SUM(J.price) as profession_paid\n" +
         "FROM Profiles P\n" +
